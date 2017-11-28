@@ -7,7 +7,7 @@ var stripComments = require('gulp-strip-comments');
 var removeEmptyLines = require('gulp-remove-empty-lines');
 var clipEmptyFiles = require('gulp-clip-empty-files');
 var sass = require('gulp-sass');
-var minifyCss = require('gulp-minify-css');
+var cleanCSS = require('gulp-clean-css');
 var rename = require('gulp-rename');
 var tap = require('gulp-tap');
 var fs = require('fs');
@@ -19,6 +19,7 @@ var gulpSlash = require('gulp-slash');
 var ngAnnotate = require('gulp-ng-annotate');
 var yargs = require('yargs');
 var zip = require('gulp-zip');
+var clean = require('gulp-clean');
 
 // Given a list of paths to search and the path to an addon, return the list of paths to search only inside the addon folder.
 function getRemoteAddonPaths(paths, pathToAddon) {
@@ -31,9 +32,14 @@ function getRemoteAddonPaths(paths, pathToAddon) {
 
   paths.forEach(function(path) {
     // Search only inside the addon folder.
-    result.push(npmPath.join(pathToAddon, path));
-    // Ignore the files inside the addon "package" (tmp) folder.
-    result.push('!' + npmPath.join(pathToPackageFolder, path));
+    // Check if the path needs to be ignored.
+    if (path[0] == '!') {
+      result.push('!' + npmPath.join(pathToAddon, path.substr(1)));
+    } else {
+      result.push(npmPath.join(pathToAddon, path));
+      // Ignore the files inside the addon "package" (tmp) folder.
+      result.push('!' + npmPath.join(pathToPackageFolder, path));
+    }
   });
 
   return result;
@@ -41,9 +47,13 @@ function getRemoteAddonPaths(paths, pathToAddon) {
 
 // Get the names of the JSON files inside a directory.
 function getFilenames(dir) {
-  return fs.readdirSync(dir).filter(function(file) {
-    return file.indexOf('.json') > -1;
-  });
+  if (fs.existsSync(dir)) {
+    return fs.readdirSync(dir).filter(function(file) {
+      return file.indexOf('.json') > -1;
+    });
+  } else {
+    return [];
+  }
 }
 
 /**
@@ -68,7 +78,7 @@ function treatFile(file, data) {
     return; // ignore
   }
   try {
-    var path = file.path.substr(file.path.indexOf('/www/') + 5, file.path.length-5);
+    var path = file.path.substr(file.path.lastIndexOf('/www/') + 5);
     data[path] = JSON.parse(file.contents.toString());
   } catch (err) {
     console.log('Error parsing JSON: ' + err);
@@ -83,6 +93,7 @@ function treatFile(file, data) {
  */
 function treatMergedData(data) {
   var merged = {};
+  var mergedOrdered = {};
 
   for (var filepath in data) {
 
@@ -99,11 +110,14 @@ function treatMergedData(data) {
     } else if (filepath.indexOf('addons') === 0) {
 
       var split = filepath.split('/'),
-        pluginName = split[1];
+        pluginName = split[1],
+        index = 2;
 
-      // Check if it's a subplugin. If so, we'll use plugin_subplugin.
-      if (split[2] != 'lang') {
-        pluginName = pluginName + '_' + split[2];
+      // Check if it's a subplugin. If so, we'll use plugin_subfolder_subfolder2_...
+      // E.g. 'mod_assign_feedback_comments'.
+      while (split[index] && split[index] != 'lang') {
+        pluginName = pluginName + '_' + split[index];
+        index++;
       }
       addProperties(merged, data[filepath], 'mma.'+pluginName+'.');
 
@@ -111,10 +125,19 @@ function treatMergedData(data) {
 
       addProperties(merged, data[filepath], 'mm.core.country-');
 
+    } else if (filepath.indexOf('core/assets/mimetypes') === 0) {
+
+      addProperties(merged, data[filepath], 'mm.core.mimetype-');
+
     }
   }
 
-  return new Buffer(JSON.stringify(merged, null, 4));
+  // Force ordering by string key.
+  Object.keys(merged).sort().forEach(function(k){
+    mergedOrdered[k] = merged[k];
+  });
+
+  return new Buffer(JSON.stringify(mergedOrdered, null, 4));
 }
 
 /**
@@ -190,6 +213,12 @@ function buildJS(jsPaths, buildDest, buildFile, license, buildingApp, replace, d
  * @return {Void}
  */
 function buildLangs(filenames, langPaths, buildDest, done) {
+  if (!filenames || !filenames.length) {
+    // If no filenames supplied, stop. Maybe it's an empty lang folder.
+    done();
+    return;
+  }
+
   var count = 0;
 
   function taskFinished() {
@@ -283,29 +312,39 @@ var license = '' +
     'ru.json', 'sv.json', 'tr.json', 'zh-cn.json', 'zh-tw.json'];
 
 var paths = {
-  build: './build',
+  build: './www/build',
   js: [
-    './app.js',
-    './core/main.js',
-    './core/lib/*.js',
-    './core/filters/*.js',
-    './core/directives/*.js',
-    './core/components/**/main.js',
-    './core/components/**/*.js',
-    './addons/**/main.js',
-    './addons/**/*.js',
-    '!./**/tests/*.js',
-    '!./**/e2e/*.js',
-    '!./**/' + remoteAddonPackageFolder + '/*.js',
-    '!./**/' + remoteAddonPackageFolder + '/**/*.js',
+    './www/app.js',
+    './www/core/main.js',
+    './www/core/lib/*.js',
+    './www/core/filters/*.js',
+    './www/core/directives/*.js',
+    './www/core/components/*/main.js', // Don't use **/main.js to ensure that top level main.js are executed before lower ones.
+    './www/core/components/*/*/main.js',
+    './www/core/components/*/*/*/main.js',
+    './www/core/components/*/*/*/*/main.js',
+    './www/core/components/*/*/*/*/**/main.js', // It's unlikely there're more subaddons.
+    './www/core/components/**/*.js',
+    './www/addons/*/main.js', // Don't use **/main.js to ensure that top level main.js are executed before lower ones.
+    './www/addons/*/*/main.js',
+    './www/addons/*/*/*/main.js',
+    './www/addons/*/*/*/*/main.js',
+    './www/addons/*/*/*/*/**/main.js', // It's unlikely there're more subaddons.
+    './www/addons/**/*.js',
+    '!./www/**/tests/*.js',
+    '!./www/**/e2e/*.js',
+    '!./www/**/workers/*.js',
+    '!./www/**/' + remoteAddonPackageFolder + '/*.js',
+    '!./www/**/' + remoteAddonPackageFolder + '/**/*.js',
   ],
   sass: {
     core: [
-      './core/scss/*.scss',
-      './core/components/**/scss/*.scss',
-      './addons/**/scss/*.scss',
-      '!./**/' + remoteAddonPackageFolder + '/*.scss',
-      '!./**/' + remoteAddonPackageFolder + '/**/*.scss',
+      './www/core/scss/styles.scss',
+      './www/core/scss/*.scss',
+      './www/core/components/**/scss/*.scss',
+      './www/addons/**/scss/*.scss',
+      '!./www/**/' + remoteAddonPackageFolder + '/*.scss',
+      '!./www/**/' + remoteAddonPackageFolder + '/**/*.scss',
     ],
     custom: [
       './scss/app.scss',
@@ -313,14 +352,15 @@ var paths = {
     ]
   },
   lang: [
-    './core/lang/',
-    './core/components/**/lang/',
-    './addons/**/lang/',
-    './core/assets/countries/',
-    '!./**/' + remoteAddonPackageFolder + '/*.json',
-    '!./**/' + remoteAddonPackageFolder + '/**/*.json',
+    './www/core/lang/',
+    './www/core/components/**/lang/',
+    './www/addons/**/lang/',
+    './www/core/assets/countries/',
+    './www/core/assets/mimetypes/',
+    '!./www/**/' + remoteAddonPackageFolder + '/*.json',
+    '!./www/**/' + remoteAddonPackageFolder + '/**/*.json',
   ],
-  config: './config.json',
+  config: './www/config.json',
   e2e: {
     build: './e2e/build',
     buildToRoot: '../../',
@@ -330,7 +370,7 @@ var paths = {
     plugins: './e2e/plugins',
     pluginsToRoot: '../../',
     specs: [
-      './**/e2e/*.spec.js'
+      './www/**/e2e/*.spec.js'
     ]
   }
 };
@@ -339,10 +379,16 @@ var remoteAddonPaths = {
   all: [
     '*',
     '**/*',
+    '!e2e/*',
+    '!**/e2e/*',
   ],
-  js: [
+  js: [ // Treat main.js files first.
+    '*/main.js',
+    '**/main.js',
     '*.js',
     '**/*.js',
+    '!e2e/*.js',
+    '!**/e2e/*.js',
   ],
   sass: [
     '*.scss',
@@ -354,6 +400,8 @@ var remoteAddonPaths = {
 };
 
 gulp.task('default', ['build', 'sass', 'lang', 'config']);
+
+gulp.task('serve:before', ['default', 'watch']);
 
 gulp.task('sass-build', function(done) {
   gulp.src(paths.sass.core)
@@ -367,7 +415,7 @@ gulp.task('sass', ['sass-build'], function(done) {
     .pipe(concat('mm.bundle.css'))
     .pipe(sass())
     .pipe(gulp.dest(paths.build))
-    .pipe(minifyCss({
+    .pipe(cleanCSS({
       keepSpecialComments: 0
     }))
     .pipe(rename({ extname: '.min.css' }))
@@ -441,7 +489,7 @@ gulp.task('e2e-build', function() {
     })
     .option('site-version', {
       alias: 'V',
-      default: '3.1.1',
+      default: 2.9,
       describe: 'The version of the site targetted by the tests (2.8, 2.9, ...)'
     })
     .option('site-uses-local-mobile', {
@@ -452,6 +500,10 @@ gulp.task('e2e-build', function() {
     .option('tablet', {
       describe: 'Indicate that the tests are run on a tablet',
       type: 'boolean'
+    })
+    .option('filter', {
+      alias: 'f',
+      describe: 'To filter the tests to be executed (i.e www/messages/e2e/*)'
     })
     .option('help', {   // Fake the help option.
       alias: 'h',
@@ -543,6 +595,7 @@ gulp.task('e2e-build', function() {
         capabilities: {},
         restartBrowserBetweenTests: true,
         onPrepare: 'FN_ONPREPARE_PLACEHOLDER',
+        getPageTimeout: 15000,  // Increase page fetching time out because of travis.
         plugins: [{
           path: npmPath.join(paths.e2e.pluginsToRoot, paths.e2e.plugins, 'wait_for_transitions.js')
         }]
@@ -565,12 +618,17 @@ gulp.task('e2e-build', function() {
         }
       };
 
-  // Preparing specs.
+  // Preparing specs. Checking first if we are filtering per specs.
   for (i in paths.e2e.libs) {
     config.specs.push(npmPath.join(paths.e2e.buildToRoot, paths.e2e.libs[i]));
   }
-  for (i in paths.e2e.specs) {
-    config.specs.push(npmPath.join(paths.e2e.buildToRoot, paths.e2e.specs[i]));
+
+  if (argv.filter) {
+    config.specs.push(npmPath.join(paths.e2e.buildToRoot, argv.filter));
+  } else {
+    for (i in paths.e2e.specs) {
+      config.specs.push(npmPath.join(paths.e2e.buildToRoot, paths.e2e.specs[i]));
+    }
   }
 
   // Browser.
@@ -611,26 +669,26 @@ gulp.task('e2e-build', function() {
   }
 
   // Prepend the onPrepare function.
-  onPrepare = "" +
-    "var wd = require('wd'),\n" +
-    "    protractor = require('protractor'),\n" +
-    "    wdBridge = require('wd-bridge')(protractor, wd);\n" +
-    "wdBridge.initFromProtractor(exports.config);\n" +
+  onPrepare = "\n" +
+    "        var wd = require('wd'),\n" +
+    "        protractor = require('protractor'),\n" +
+    "        wdBridge = require('wd-bridge')(protractor, wd);\n" +
+    "        wdBridge.initFromProtractor(exports.config);\n" +
     "\n" +
-    "// Define global variables for our tests.\n" +
-    "global.ISANDROID      = " + (argv.target == 'android' ? 'true' : 'false') + ";\n" +
-    "global.ISBROWSER      = " + (argv.target == 'browser' ? 'true' : 'false') + ";\n" +
-    "global.ISIOS          = " + (argv.target == 'ios' ? 'true' : 'false') + ";\n" +
-    "global.ISTABLET       = " + (argv.tablet ? 'true' : 'false') + ";\n" +
-    "global.DEVICEURL      = " + (argv.url ? "'" + argv.url + "'" : undefined) + ";\n" +
-    "global.DEVICEVERSION  = " + (argv.version ? "'" + argv.version + "'" : 'undefined') + ";\n" +
-    "global.SITEURL        = '" + (argv['site-url']) + "';\n" +
-    "global.SITEVERSION    = " + (argv['site-version']) + ";\n" +
-    "global.SITEHASLM      = " + (argv['site-has-local-mobile'] ? 'true' : 'false') + ";\n" +
-    "global.USERS          = " + JSON.stringify(users) + ";\n" +
-    "\n";
+    "        // Define global variables for our tests.\n" +
+    "        global.ISANDROID      = " + (argv.target == 'android' ? 'true' : 'false') + ";\n" +
+    "        global.ISBROWSER      = " + (argv.target == 'browser' ? 'true' : 'false') + ";\n" +
+    "        global.ISIOS          = " + (argv.target == 'ios' ? 'true' : 'false') + ";\n" +
+    "        global.ISTABLET       = " + (argv.tablet ? 'true' : 'false') + ";\n" +
+    "        global.DEVICEURL      = " + (argv.url ? "'" + argv.url + "'" : undefined) + ";\n" +
+    "        global.DEVICEVERSION  = " + (argv.version ? "'" + argv.version + "'" : 'undefined') + ";\n" +
+    "        global.SITEURL        = '" + (argv['site-url']) + "';\n" +
+    "        global.SITEVERSION    = " + (argv['site-version']) + ";\n" +
+    "        global.SITEHASLM      = " + (argv['site-has-local-mobile'] ? 'true' : 'false') + ";\n" +
+    "        global.USERS          = \n" + JSON.stringify(users, null, 4) + ";    \n" +
+    "    ";
 
-  configStr = JSON.stringify(config);
+  configStr = JSON.stringify(config, null, 4);
   configStr = configStr.replace('"FN_ONPREPARE_PLACEHOLDER"', "function(){" + onPrepare + "}");
   configStr = 'exports.config = ' + configStr + ';';
 
@@ -707,13 +765,16 @@ gulp.task('remoteaddon-build', ['remoteaddon-copy'], function(done) {
   pathToReplace = newYargs.argv.jspath;
   if (typeof pathToReplace == 'undefined') {
     if (path.indexOf('www') === 0) {
-      pathToReplace = path.replace('www/', '');
+      pathToReplace = path.replace(/www[\/\\]/, '');
     } else {
       pathToReplace = path;
     }
   }
 
   jsPaths = getRemoteAddonPaths(remoteAddonPaths.js, path);
+
+  // Convert all backslash (\) to slash (/) to make it work in Windows.
+  pathToReplace = pathToReplace.replace(/\\/g, '/');
 
   if (pathToReplace.slice(-1) == '/') {
     wildcard = wildcard + '/';
@@ -762,6 +823,11 @@ gulp.task('remoteaddon-lang', ['remoteaddon-copy'], function(done) {
   langPaths = getRemoteAddonPaths(remoteAddonPaths.lang, path);
   addonPackagePath = npmPath.join(path, remoteAddonPackageFolder);
   buildDest = npmPath.join(addonPackagePath, 'lang');
+  if (!fs.existsSync(langPaths[0])) {
+    // No lang folder, stop.
+    done();
+    return;
+  }
 
   // Get filenames to know which languages are available.
   filenames = filenames.concat(getFilenames(langPaths[0]));
@@ -837,4 +903,44 @@ gulp.task('remoteaddon', ['remoteaddon-build', 'remoteaddon-sass', 'remoteaddon-
       deleteFolderRecursive(pathToPackageFolder);
       done();
     });
+});
+
+// Cleans the development environment by deleting downloaded files and libraries
+gulp.task('clean-libs', ['clean-www-libs', 'clean-ionic-platforms', 'clean-e2e-build', 'clean-sass-cache', 'clean-ionic-plugins']);
+
+// Removes the contents in the /www/lib/ directory
+gulp.task('clean-www-libs', function() {
+  return gulp.src('lib/', {read: false})
+    .pipe(clean());
+});
+
+// Removes the contents in the /platforms directory
+gulp.task('clean-ionic-platforms', function() {
+  return gulp.src('platforms/', {read: false})
+    .pipe(clean());
+});
+
+// Removes the contents in the /plugins directory
+gulp.task('clean-ionic-plugins', function() {
+  return gulp.src('plugins/', {read: false})
+    .pipe(clean());
+});
+
+// Removes the contents in the /www/build directory
+gulp.task('clean-build', function() {
+  return gulp.src('build/', {read: false})
+    .pipe(clean());
+});
+
+
+// Removes the contents in the /.sass-cache directory
+gulp.task('clean-sass-cache', function() {
+  return gulp.src('.sass-cache/', {read: false})
+    .pipe(clean());
+});
+
+// Removes the contents in the /node-modules directory
+gulp.task('clean-node-modules', function() {
+  return gulp.src('node_modules/', {read: false})
+    .pipe(clean());
 });
