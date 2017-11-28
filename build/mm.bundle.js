@@ -66193,7 +66193,7 @@ angular.module('mm.core')
      "demo_sites": "",
     "gcmpn": "694767596569",
     "customurlscheme": "moodlemobile",
-    "siteurl" : "https://www.proventuresindia.com/provlms",
+    "siteurl" : "https://www.proventuresindia.com/provlms/",
     "skipssoconfirmation": "false",
     "forcedefaultlanguage": "false",
     "privacypolicy": "https://moodle.org/mod/page/view.php?id=8148"
