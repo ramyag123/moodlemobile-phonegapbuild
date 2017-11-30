@@ -14449,3 +14449,47 @@ ion-popover-view {
 .mma-qtype-multianswer-container input[type="radio"], .mma-qtype-multianswer-container input[type="checkbox"] {
   margin-top: -4px;
   margin-right: 7px; }
+/*added by ramyag*/
+ion-content.mm-site_mod_book table
+{
+background:#fff;
+border-collapse:collapse;
+box-shadow:0px 0px 5px 0px #e8e8e8;
+margin-bottom:15px;
+border-spacing:0px;
+max-width:100%;
+display:table;
+border-color:grey;
+box-sizing:border-box;
+text-align:left;
+color:#333;
+margin-left:auto;margin-right:auto;margin:8px
+auto;clear:both;
+table-layout:fixed;
+border:1px solid #ccc;border-collapse:separate;border-spacing:0;border-bottom-width:0;border-right-width:0;margin-bottom:2em;
+border-left-width:0;border-right-width:1px;max-width:initial;
+
+background:#fff;border-collapse:collapse;-webkit-box-shadow:0px 0px 5px 0px #e8e8e8;-moz-box-shadow:0px 0px 5px 0px #e8e8e8;box-shadow:0px 0px 5px 0px #e8e8e8;margin-bottom:15px
+}
+ion-content.mm-site_mod_book th {
+    font-weight: bold;
+}
+ion-content.mm-site_mod_book td, ion-content.mm-site_mod_book  th {
+    display: table-cell;
+    vertical-align: inherit;padding:5px;border:1px solid #e8e8e8
+}
+ion-content.mm-site_mod_book tr {
+    display: table-row;
+    vertical-align: inherit;
+    border-color: inherit;
+}
+ion-content.mm-site_mod_book table caption
+{
+	font-size:24px; font-weight:bold;line-height:42px;text-align:left;padding-top:8px; padding-bottom:8px;color:#777;
+}
+ion-content.mm-site_mod_book table a,a.glossary{color:#6091ba; text-decoration:none;}
+ion-content.mm-site_mod_book table a:hover,a.autolink.glossary:hover
+{
+	cursor:pointer;text-decoration:none;color:#365d7e;outline:none;
+}
+a.autolink.glossary:hover{cursor:help;}
