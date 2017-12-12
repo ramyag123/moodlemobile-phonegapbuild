@@ -2,7 +2,7 @@
 <widget xmlns     = "http://www.w3.org/ns/widgets"
         xmlns:gap = "http://phonegap.com/ns/1.0"
         xmlns:android = "http://schemas.android.com/apk/res/android"
-        id        = "com.moodle.moodlemobile"
+        id        = "com.proventuresindia.provlms"
         versionCode = "20200"
         version   = "3.3.2">
     <name>ProventuresLMS</name>
@@ -11,7 +11,7 @@
         ProventuresLMS: Online PMP Certification Training Portal
     </description>
 
-    <author href="http://moodle.com" email="mobile@moodle.com">
+    <author href="http://moodle.com" email="support@proventuresindia.com">
         Moodle Mobile team
     </author>
 	

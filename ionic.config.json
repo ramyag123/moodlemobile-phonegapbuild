@@ -1,0 +1,14 @@
+{
+  "name": "ProventuresLMS",
+  "app_id": "com.proventuresindia.provlms",
+  "integrations": {
+    "gulp": {}
+  },
+  "type": "ionic1",
+  "watchPatterns": [
+    "scss/**/*",
+    "www/**/*",
+    "!www/lib/**/*",
+    "!www/**/*.map"
+  ]
+}

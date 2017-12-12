@@ -66180,9 +66180,9 @@ angular.module('mm.addons.mod_wiki')
 angular.module('mm.core')
 
 .constant('mmCoreConfigConstants', {
-    "app_id" : "com.moodle.moodlemobile",
-    "appname": "Moodle Mobile",
-    "desktopappname": "Moodle Desktop",
+    "app_id" : "com.proventuresindia.provlms",
+    "appname": "PROVENTURES LMS Mobile",
+    "desktopappname": "PROVENTURES LMS Desktop",
     "versioncode" : "2020",
     "versionname" : "3.3.2",
     "cache_expiration_time" : 300000,
