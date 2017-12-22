@@ -66183,7 +66183,7 @@ angular.module('mm.core')
     "app_id" : "com.proventuresindia.provlms",
     "appname": "PROVENTURES LMS Mobile",
     "desktopappname": "PROVENTURES LMS Desktop",
-    "versioncode" : "2020",
+    "versioncode" : "2010",
     "versionname" : "3.3.2",
     "cache_expiration_time" : 300000,
     "default_lang" : "en",
